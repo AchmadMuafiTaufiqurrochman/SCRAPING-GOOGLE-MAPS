@@ -11,13 +11,8 @@ class Business:
     """holds business data"""
     name: str = None
     address: str = None
-    domain: str = None
-    website: str = None
-    phone_number: str = None
     category: str = None
     location: str = None
-    reviews_count: int = None
-    reviews_average: float = None
     latitude: float = None
     longitude: float = None
     
@@ -191,11 +186,7 @@ def main():
 
                     name_attribute = 'h1.DUwDvf'
                     address_xpath = '//button[@data-item-id="address"]//div[contains(@class, "fontBodyMedium")]'
-                    website_xpath = '//a[@data-item-id="authority"]//div[contains(@class, "fontBodyMedium")]'
-                    phone_number_xpath = '//button[contains(@data-item-id, "phone:tel:")]//div[contains(@class, "fontBodyMedium")]'
-                    review_count_xpath = '//div[@jsaction="pane.reviewChart.moreReviews"]//span'
-                    reviews_average_xpath = '//div[@jsaction="pane.reviewChart.moreReviews"]//div[@role="img"]' # or .fontDisplayLarge locator
-                                                           
+
                     business = Business()
                    
                     if name_value := page.locator(name_attribute).inner_text():
@@ -208,27 +199,7 @@ def main():
                     else:
                         business.address = ""
 
-                    if page.locator(website_xpath).count() > 0:
-                        business.domain = page.locator(website_xpath).all()[0].inner_text()
-                        business.website = f"https://www.{page.locator(website_xpath).all()[0].inner_text()}"
-                    else:
-                        business.website = ""
 
-                    if page.locator(phone_number_xpath).count() > 0:
-                        business.phone_number = page.locator(phone_number_xpath).all()[0].inner_text()
-                    else:
-                        business.phone_number = ""
-                        
-                    if page.locator(review_count_xpath).count() > 0:
-                        reviews_text = page.locator(review_count_xpath).inner_text().split()[0].replace(',', '').strip()
-                        business.reviews_count = int(reviews_text) if reviews_text.isdigit() else 0
-                    else:
-                        business.reviews_count = ""
-                        
-                    if page.locator(reviews_average_xpath).count() > 0:
-                        business.reviews_average = float(page.locator(reviews_average_xpath).get_attribute('aria-label').split()[0].replace(',', '.').strip())
-                    else:
-                        business.reviews_average = ""
                 
                     business.category = search_for.split(' in ')[0].strip()
                     business.location = search_for.split(' in ')[-1].strip()
