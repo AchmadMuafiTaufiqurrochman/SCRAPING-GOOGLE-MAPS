@@ -5,7 +5,7 @@ import pandas as pd
 import argparse
 import os
 import sys
-
+from openlocationcode import openlocationcode as olc
 @dataclass
 class Business:
     """holds business data"""
@@ -13,6 +13,7 @@ class Business:
     address: str = None
     category: str = None
     location: str = None
+    plus_code: str = None
     latitude: float = None
     longitude: float = None
     
@@ -26,12 +27,6 @@ class Business:
         # We'll include name plus any non-empty contact info fields
         hash_fields = [self.name]
         # Only include contact info fields if they're not empty
-        if self.domain:
-            hash_fields.append(f"domain:{self.domain}")
-        if self.website:
-            hash_fields.append(f"website:{self.website}")
-        if self.phone_number:
-            hash_fields.append(f"phone:{self.phone_number}")
         
         return hash(tuple(hash_fields))
 
@@ -84,6 +79,17 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     # return latitude, longitude
     return float(coordinates.split(',')[0]), float(coordinates.split(',')[1])
 
+def extract_latlng_from_plus_code(plus_code: str):
+    """
+    Extract latitude and longitude from a plus code string.
+    Returns (latitude, longitude) tuple or (None, None) if invalid.
+    """
+    try:
+        code = plus_code.split(' ')[0].strip()  # Ambil kode saja, tanpa lokasi
+        decoded = olc.decode(code)
+        return decoded.latitudeCenter, decoded.longitudeCenter
+    except Exception:
+        return None, None
 
 def main():
     # read search from arguments
@@ -186,7 +192,12 @@ def main():
 
                     name_attribute = 'h1.DUwDvf'
                     address_xpath = '//button[@data-item-id="address"]//div[contains(@class, "fontBodyMedium")]'
-
+                    # website_xpath = '//a[@data-item-id="authority"]//div[contains(@class, "fontBodyMedium")]'
+                    # phone_number_xpath = '//button[contains(@data-item-id, "phone:tel:")]//div[contains(@class, "fontBodyMedium")]'
+                    # review_count_xpath = '//div[@jsaction="pane.reviewChart.moreReviews"]//span'
+                    # reviews_average_xpath = '//div[@jsaction="pane.reviewChart.moreReviews"]//div[@role="img"]' # or .fontDisplayLarge locator
+                    plus_code_button_xpath = '//button[contains(@class, "CsEnBe") and @data-item-id="oloc"]'
+                    plus_code_text_xpath = '//div[contains(@class, "Io6YTe") and contains(@class, "fontBodyMedium") and contains(@class, "kR99db") and contains(@class, "fdkmkc")]'                    
                     business = Business()
                    
                     if name_value := page.locator(name_attribute).inner_text():
@@ -198,21 +209,34 @@ def main():
                         business.address = page.locator(address_xpath).all()[0].inner_text()
                     else:
                         business.address = ""
+                    if page.locator(plus_code_button_xpath).count() > 0:
+                        aria_label = page.locator(plus_code_button_xpath).first.get_attribute("aria-label")
+                        # Contoh isi aria_label: "Plus code: 4H43+43 Beji, Batu City, East Java"
+                        if aria_label and "Plus code:" in aria_label:
+                            plus_code_full = aria_label.replace("Plus code:", "").strip()
+                            business.plus_code = plus_code_full.split(' ')[0]
+                            business.latitude, business.longitude = extract_latlng_from_plus_code(business.plus_code)
+                        else:
+                            business.plus_code = ""
+                            business.latitude, business.longitude = None, None
+                    else:
+                        business.plus_code = ""
+                        business.latitude, business.longitude = None, None
 
 
-                
+                    
                     business.category = search_for.split(' in ')[0].strip()
                     business.location = search_for.split(' in ')[-1].strip()
-                    business.latitude, business.longitude = extract_coordinates_from_url(page.url)
+                    # business.latitude, business.longitude = extract_coordinates_from_url(page.url)
 
                     business_list.add_business(business)
                 except Exception as e:
                     print(f'Error occurred: {e}', end='\r')
             
             # output
-            business_list.save_to_excel(f"{search_for}".replace(' ', '_'))
-            business_list.save_to_csv(f"{search_for}".replace(' ', '_'))
-
+            filename = f"{search_for}".replace(' ', '_').replace('\n', '').replace('\r', '')
+            business_list.save_to_excel(filename)
+            business_list.save_to_csv(filename)
         browser.close()
 
 if __name__ == "__main__":
