@@ -85,10 +85,13 @@ def extract_latlng_from_plus_code(plus_code: str):
     Returns (latitude, longitude) tuple or (None, None) if invalid.
     """
     try:
-        code = plus_code.split(' ')[0].strip()  # Ambil kode saja, tanpa lokasi
-        decoded = olc.decode(code)
+        code = plus_code.split(' ')[0].strip()
+        # Jika code terlalu pendek (short code), tidak bisa didecode tanpa area
+        decoded = olc.decode(olc.recoverNearest(code, -7.883063867394289, 112.53430108928096))
+        # decoded = olc.decode(code)
         return decoded.latitudeCenter, decoded.longitudeCenter
-    except Exception:
+    except Exception as e:
+        print(f"Decode error: {e}")
         return None, None
 
 def main():
@@ -224,7 +227,6 @@ def main():
                         business.latitude, business.longitude = None, None
 
 
-                    
                     business.category = search_for.split(' in ')[0].strip()
                     business.location = search_for.split(' in ')[-1].strip()
                     # business.latitude, business.longitude = extract_coordinates_from_url(page.url)
