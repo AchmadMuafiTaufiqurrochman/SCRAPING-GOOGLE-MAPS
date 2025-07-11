@@ -173,4 +173,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-GMaps Data/2025-07-10/*
+GMaps Data/*

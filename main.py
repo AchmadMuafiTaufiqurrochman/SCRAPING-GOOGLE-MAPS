@@ -6,6 +6,8 @@ import argparse
 import os
 import sys
 from openlocationcode import openlocationcode as olc
+
+
 @dataclass
 class Business:
     """holds business data"""
@@ -16,6 +18,8 @@ class Business:
     plus_code: str = None
     latitude: float = None
     longitude: float = None
+    iframe_url: str = None
+    
     
     def __hash__(self):
         """Make Business hashable for duplicate detection.
