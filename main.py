@@ -19,6 +19,8 @@ class Business:
     latitude: float = None
     longitude: float = None
     iframe_url: str = None
+    jam_operasional: str = None
+
     
     
     def __hash__(self):
@@ -205,6 +207,8 @@ def main():
                     # reviews_average_xpath = '//div[@jsaction="pane.reviewChart.moreReviews"]//div[@role="img"]' # or .fontDisplayLarge locator
                     plus_code_button_xpath = '//button[contains(@class, "CsEnBe") and @data-item-id="oloc"]'
                     plus_code_text_xpath = '//div[contains(@class, "Io6YTe") and contains(@class, "fontBodyMedium") and contains(@class, "kR99db") and contains(@class, "fdkmkc")]'                    
+
+                    
                     business = Business()
                    
                     if name_value := page.locator(name_attribute).inner_text():
@@ -234,6 +238,16 @@ def main():
                     business.category = search_for.split(' in ')[0].strip()
                     business.location = search_for.split(' in ')[-1].strip()
                     # business.latitude, business.longitude = extract_coordinates_from_url(page.url)
+                    try:
+                        monday_row = page.locator('//tr[.//div[text()="Monday"]]')
+                        if monday_row.count() > 0:
+                            time = monday_row.locator('td.mxowUb').first.get_attribute('aria-label').strip()
+                            business.jam_operasional = time
+                        else:
+                            business.jam_operasional = None
+                    except Exception as e:
+                        print(f"Error getting Monday hours: {e}")
+                        business.jam_operasional = None
 
                     business_list.add_business(business)
                 except Exception as e:
