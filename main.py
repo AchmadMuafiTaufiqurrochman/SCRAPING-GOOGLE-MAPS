@@ -126,19 +126,28 @@ def extract_latlng_from_plus_code(plus_code: str):
         return None, None
 
 def format_operational_time(time_str: str) -> str:
-    """Convert time format from '10.00 am to 10.00 pm' to '10.00-22.00 WIB'"""
+    """Convert time format to 24-hour format with WIB"""
     try:
-        if ' to ' in time_str:
-            start_str, end_str = time_str.split(' to ')
-            # Handle both dot and colon time formats
-            start = datetime.datetime.strptime(
-                start_str.replace('.', ':'), 
-                "%I:%M %p"
-            )
-            end = datetime.datetime.strptime(
-                end_str.replace('.', ':'), 
-                "%I:%M %p"
-            )
+        if time_str == "Open 24 hours":
+            return "24 Jam"
+        
+        time_str = time_str.replace(' ', ' ').replace('–', 'to').strip()
+        
+        if 'to' in time_str.lower():
+            separator = 'to' if 'to' in time_str else 'TO'
+            start_str, end_str = time_str.split(separator, 1)
+            
+            # Handle times without AM/PM
+            def parse_time(t):
+                t = t.strip().replace('.', ':')
+                try:
+                    return datetime.datetime.strptime(t, "%I:%M %p")
+                except ValueError:
+                    return datetime.datetime.strptime(t, "%H:%M")
+
+            start = parse_time(start_str)
+            end = parse_time(end_str)
+            
             return f"{start.strftime('%H.%M')}-{end.strftime('%H.%M')} WIB"
         return time_str
     except Exception as e:
