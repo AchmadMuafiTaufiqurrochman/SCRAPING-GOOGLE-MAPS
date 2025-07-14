@@ -28,10 +28,7 @@ class Business:
     kecamatan_id: str = None
     desa: str = None
     desa_id: str = None
-    
 
-
-    
     
     def __hash__(self):
         """Make Business hashable for duplicate detection.
@@ -167,6 +164,45 @@ def get_kecamatan_id(kecamatan_name: str) -> str:
         "bumiaji": "357902"
     }
     return kecamatan_mapping.get(kecamatan_name.lower(), None)
+
+def extract_desa(address: str) -> str:
+    """Extract village name from address using regex pattern"""
+    if not address:
+        return None
+    # Pattern explanation: Capture text between comma and kecamatan mention
+    # Example: "..., Sisir, Kec. Batu..." -> captures "Sisir"
+    desa_match = re.search(r',\s*([^,]+?)\s*,\s*Kec\.', address, re.IGNORECASE)
+    return desa_match.group(1).strip() if desa_match else None
+
+def get_desa_id(desa_name: str) -> str:
+    """Maps village name to its ID (case-insensitive)"""
+    desa_mapping = {
+        "dadaprejo": "3579031001",
+        "beji": "3579032002",
+        "junrejo": "3579032003",
+        "tlekung": "3579032004",
+        "mojorejo": "3579032005",
+        "pendem": "3579032006",
+        "torongrejo": "3579032007",
+        "temas": "3579011001",
+        "ngaglik": "3579011002",
+        "songgokerto": "3579011003",
+        "sisir": "3579011004",
+        "sumberejo": "3579012005",
+        "oro-oro ombo": "3579012006",
+        "sidomulyo": "3579012007",
+        "pesanggrahan": "3579012008",
+        "punten": "3579022001",
+        "gunungsari": "3579022002",
+        "tulungrejo": "3579022003",
+        "sumbergondo": "3579022004",
+        "pandanrejo": "3579022005",
+        "bumiaji": "3579022006",
+        "giripurno": "3579022007",
+        "bulukerto": "3579022008",
+        "sumberbrantas": "3579022009"
+    }
+    return desa_mapping.get(desa_name.lower().strip(), None)
 
 def main():
     # read search from arguments
@@ -360,30 +396,33 @@ def main():
                     else:
                         business.color = "#CB0404"
 
+                    # Single check for address existence
                     if page.locator(address_xpath).count() > 0:
-                        business.address = page.locator(address_xpath).all()[0].inner_text()
-                        # Extract kecamatan from address
-                        kec_match = re.search(r'kec\.\s*([^,]+)', business.address, re.IGNORECASE)
-                        business.kecamatan = kec_match.group(1).strip() if kec_match else None
-                    else:
-                        business.address = ""
-                        business.kecamatan = None
-
-                    if page.locator(address_xpath).count() > 0:
-                        business.address = page.locator(address_xpath).all()[0].inner_text()
-                        kec_match = re.search(r'kec\.\s*([^,]+)', business.address, re.IGNORECASE)
+                        address_text = page.locator(address_xpath).all()[0].inner_text()
+                        business.address = address_text
+                        
+                        # Single regex match for kecamatan
+                        kec_match = re.search(r'kec\.\s*([^,]+)', address_text, re.IGNORECASE)
                         if kec_match:
                             kec_name = kec_match.group(1).strip()
                             business.kecamatan = kec_name
-                            business.kecamatan_id = get_kecamatan_id(kec_name)  # Clean single function call
+                            business.kecamatan_id = get_kecamatan_id(kec_name)
                         else:
                             business.kecamatan = None
                             business.kecamatan_id = None
+                            
+                        # Desa extraction
+                        business.desa = extract_desa(address_text)
+                        business.desa_id = get_desa_id(business.desa) if business.desa else None
+                        
                     else:
                         business.address = ""
                         business.kecamatan = None
                         business.kecamatan_id = None
+                        business.desa = None
+                        business.desa_id = None
 
+                        
                     business_list.add_business(business)
                 except Exception as e:
                     print(f'Error occurred: {e}', end='\r')
