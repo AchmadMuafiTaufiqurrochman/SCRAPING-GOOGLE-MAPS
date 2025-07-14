@@ -7,7 +7,7 @@ import os
 import sys
 from openlocationcode import openlocationcode as olc
 import random
-
+import re
 
 @dataclass
 class Business:
@@ -24,6 +24,11 @@ class Business:
     name_image: str = None
     built_year: int = None
     color: str = None
+    kecamatan: str = None
+    kecamatan_id: str = None
+    desa: str = None
+    desa_id: str = None
+    
 
 
     
@@ -153,6 +158,15 @@ def format_operational_time(time_str: str) -> str:
     except Exception as e:
         print(f"Time format error: {e}")
         return time_str
+    
+def get_kecamatan_id(kecamatan_name: str) -> str:
+    """Maps kecamatan name to its ID (case-insensitive)"""
+    kecamatan_mapping = {
+        "junrejo": "357903",
+        "batu": "357901",
+        "bumiaji": "357902"
+    }
+    return kecamatan_mapping.get(kecamatan_name.lower(), None)
 
 def main():
     # read search from arguments
@@ -305,7 +319,6 @@ def main():
                         print(f"Error getting Monday hours: {e}")
                         business.jam_operasional = None
 
-
                     if name_value := page.locator(name_attribute).inner_text():
                         business.name = name_value.strip()
                         business_list.download_image(page, business)
@@ -346,6 +359,30 @@ def main():
                         business.color = "#F4631E"
                     else:
                         business.color = "#CB0404"
+
+                    if page.locator(address_xpath).count() > 0:
+                        business.address = page.locator(address_xpath).all()[0].inner_text()
+                        # Extract kecamatan from address
+                        kec_match = re.search(r'kec\.\s*([^,]+)', business.address, re.IGNORECASE)
+                        business.kecamatan = kec_match.group(1).strip() if kec_match else None
+                    else:
+                        business.address = ""
+                        business.kecamatan = None
+
+                    if page.locator(address_xpath).count() > 0:
+                        business.address = page.locator(address_xpath).all()[0].inner_text()
+                        kec_match = re.search(r'kec\.\s*([^,]+)', business.address, re.IGNORECASE)
+                        if kec_match:
+                            kec_name = kec_match.group(1).strip()
+                            business.kecamatan = kec_name
+                            business.kecamatan_id = get_kecamatan_id(kec_name)  # Clean single function call
+                        else:
+                            business.kecamatan = None
+                            business.kecamatan_id = None
+                    else:
+                        business.address = ""
+                        business.kecamatan = None
+                        business.kecamatan_id = None
 
                     business_list.add_business(business)
                 except Exception as e:
