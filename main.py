@@ -6,7 +6,8 @@ import argparse
 import os
 import sys
 from openlocationcode import openlocationcode as olc
-import re
+import random
+
 
 @dataclass
 class Business:
@@ -14,7 +15,6 @@ class Business:
     name: str = None
     address: str = None
     category: str = None
-    location: str = None
     plus_code: str = None
     latitude: float = None
     longitude: float = None
@@ -22,6 +22,9 @@ class Business:
     jam_operasional: str = None
     size_image: str = None
     name_image: str = None
+    built_year: int = None
+    color: str = None
+
 
     
     
@@ -122,7 +125,25 @@ def extract_latlng_from_plus_code(plus_code: str):
         print(f"Decode error: {e}")
         return None, None
 
-
+def format_operational_time(time_str: str) -> str:
+    """Convert time format from '10.00 am to 10.00 pm' to '10.00-22.00 WIB'"""
+    try:
+        if ' to ' in time_str:
+            start_str, end_str = time_str.split(' to ')
+            # Handle both dot and colon time formats
+            start = datetime.datetime.strptime(
+                start_str.replace('.', ':'), 
+                "%I:%M %p"
+            )
+            end = datetime.datetime.strptime(
+                end_str.replace('.', ':'), 
+                "%I:%M %p"
+            )
+            return f"{start.strftime('%H.%M')}-{end.strftime('%H.%M')} WIB"
+        return time_str
+    except Exception as e:
+        print(f"Time format error: {e}")
+        return time_str
 
 def main():
     # read search from arguments
@@ -226,8 +247,9 @@ def main():
                     name_attribute = 'h1.DUwDvf'
                     address_xpath = '//button[@data-item-id="address"]//div[contains(@class, "fontBodyMedium")]'
                     plus_code_button_xpath = '//button[contains(@class, "CsEnBe") and @data-item-id="oloc"]'
-                    plus_code_text_xpath = '//div[contains(@class, "Io6YTe") and contains(@class, "fontBodyMedium") and contains(@class, "kR99db") and contains(@class, "fdkmkc")]'                    
-
+                    share_selector = '//button[@aria-label="Share" and contains(@class, "g88MCb")]'
+                    embbed_map_button_selector = '//button[@aria-label="Embed a map"]'
+                    input_selector = 'input.yA7sBe'
                     
                     business = Business()
                    
@@ -266,8 +288,8 @@ def main():
                     try:
                         monday_row = page.locator('//tr[.//div[text()="Monday"]]')
                         if monday_row.count() > 0:
-                            time = monday_row.locator('td.mxowUb').first.get_attribute('aria-label').strip()
-                            business.jam_operasional = time
+                            time_str = monday_row.locator('td.mxowUb').first.get_attribute('aria-label').strip()
+                            business.jam_operasional = format_operational_time(time_str)
                         else:
                             business.jam_operasional = None
                     except Exception as e:
@@ -284,16 +306,15 @@ def main():
                     # Add iframe URL extraction
                     try:
                         # Use more specific selector for share button
-                        share_selector = '//button[@aria-label="Share" and contains(@class, "g88MCb")]'
+                       
                         page.locator(share_selector).click()
                         page.wait_for_timeout(3000)  # Increased timeout
                         
                         # Click embed map button
-                        page.locator('//button[@aria-label="Embed a map"]').click()
+                        page.locator(embbed_map_button_selector).click()
                         page.wait_for_timeout(3000)
                         
                         # Extract iframe URL from input field
-                        input_selector = 'input.yA7sBe'
                         page.wait_for_selector(input_selector)
                         iframe_html = page.locator(input_selector).input_value()
                         
@@ -308,6 +329,14 @@ def main():
                         business.iframe_url = None
 
                     business.category = search_for.split(' in ')[0].strip()
+                    business.built_year = random.choice([2024, 2025, 2026])
+                    
+                    if business.built_year == 2024:
+                        business.color = "#309898"
+                    elif business.built_year == 2025:
+                        business.color = "#F4631E"
+                    else:
+                        business.color = "#CB0404"
 
                     business_list.add_business(business)
                 except Exception as e:
