@@ -6,7 +6,7 @@ import argparse
 import os
 import sys
 from openlocationcode import openlocationcode as olc
-
+import re
 
 @dataclass
 class Business:
@@ -20,6 +20,8 @@ class Business:
     longitude: float = None
     iframe_url: str = None
     jam_operasional: str = None
+    size_image: str = None
+    name_image: str = None
 
     
     
@@ -53,7 +55,33 @@ class BusinessList:
         if business_hash not in self._seen_businesses:
             self.business_list.append(business)
             self._seen_businesses.add(business_hash)
-    
+
+    def download_image(self, page, business):
+        """Download and save business image if available"""
+        try:
+            image_locator = page.locator('//button[contains(@aria-label, "Photo of")]/img')
+            if image_locator.count() > 0:
+                image_url = image_locator.first.get_attribute('src')
+                if image_url and business.name:
+                    sanitized_name = "".join([c for c in business.name if c.isalnum() or c in (' ', '-', '_')]).rstrip()
+                    sanitized_name = sanitized_name.replace('/', '_').replace('\\', '_')
+                    images_dir = os.path.join(self.save_at, 'images')
+                    os.makedirs(images_dir, exist_ok=True)
+                    
+                    response = page.request.get(image_url)
+                    if response.ok:
+                        file_path = os.path.join(images_dir, f"{sanitized_name}.jpg")
+                        with open(file_path, 'wb') as f:
+                            f.write(response.body())
+                        
+                        # Add these lines to store image info
+                        file_size = os.path.getsize(file_path)
+                        size_number = round(file_size/1024, 2)
+                        business.size_image = f"{int(size_number * 100)}"  # 64.92 becomes 6492
+                        business.name_image = f"{sanitized_name}.jpg"
+        except Exception as e:
+            print(f"Error saving image: {e}")
+
     def dataframe(self):
         """transform business_list to pandas dataframe
 
@@ -79,12 +107,6 @@ class BusinessList:
         """
         self.dataframe().to_csv(f"{self.save_at}/{filename}.csv", index=False)
 
-def extract_coordinates_from_url(url: str) -> tuple[float, float]:
-    """helper function to extract coordinates from url"""
-    coordinates = url.split('/@')[-1].split('/')[0]
-    # return latitude, longitude
-    return float(coordinates.split(',')[0]), float(coordinates.split(',')[1])
-
 def extract_latlng_from_plus_code(plus_code: str):
     """
     Extract latitude and longitude from a plus code string.
@@ -99,6 +121,8 @@ def extract_latlng_from_plus_code(plus_code: str):
     except Exception as e:
         print(f"Decode error: {e}")
         return None, None
+
+
 
 def main():
     # read search from arguments
@@ -201,10 +225,6 @@ def main():
 
                     name_attribute = 'h1.DUwDvf'
                     address_xpath = '//button[@data-item-id="address"]//div[contains(@class, "fontBodyMedium")]'
-                    # website_xpath = '//a[@data-item-id="authority"]//div[contains(@class, "fontBodyMedium")]'
-                    # phone_number_xpath = '//button[contains(@data-item-id, "phone:tel:")]//div[contains(@class, "fontBodyMedium")]'
-                    # review_count_xpath = '//div[@jsaction="pane.reviewChart.moreReviews"]//span'
-                    # reviews_average_xpath = '//div[@jsaction="pane.reviewChart.moreReviews"]//div[@role="img"]' # or .fontDisplayLarge locator
                     plus_code_button_xpath = '//button[contains(@class, "CsEnBe") and @data-item-id="oloc"]'
                     plus_code_text_xpath = '//div[contains(@class, "Io6YTe") and contains(@class, "fontBodyMedium") and contains(@class, "kR99db") and contains(@class, "fdkmkc")]'                    
 
@@ -234,6 +254,11 @@ def main():
                         business.plus_code = ""
                         business.latitude, business.longitude = None, None
 
+                    if name_value := page.locator(name_attribute).inner_text():
+                        business.name = name_value.strip()
+                        business_list.download_image(page, business)  # Fixed: use business_list instead of self
+                    else:
+                        business.name = ""
 
                     business.category = search_for.split(' in ')[0].strip()
                     business.location = search_for.split(' in ')[-1].strip()
@@ -248,6 +273,41 @@ def main():
                     except Exception as e:
                         print(f"Error getting Monday hours: {e}")
                         business.jam_operasional = None
+
+
+                    if name_value := page.locator(name_attribute).inner_text():
+                        business.name = name_value.strip()
+                        business_list.download_image(page, business)
+                    else:
+                        business.name = ""
+
+                    # Add iframe URL extraction
+                    try:
+                        # Use more specific selector for share button
+                        share_selector = '//button[@aria-label="Share" and contains(@class, "g88MCb")]'
+                        page.locator(share_selector).click()
+                        page.wait_for_timeout(3000)  # Increased timeout
+                        
+                        # Click embed map button
+                        page.locator('//button[@aria-label="Embed a map"]').click()
+                        page.wait_for_timeout(3000)
+                        
+                        # Extract iframe URL from input field
+                        input_selector = 'input.yA7sBe'
+                        page.wait_for_selector(input_selector)
+                        iframe_html = page.locator(input_selector).input_value()
+                        
+                        # Parse src from iframe HTML
+                        business.iframe_url = iframe_html
+                        
+                        # Close dialog
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(1000) 
+                    except Exception as e:
+                        print(f"Error getting iframe URL: {e}")
+                        business.iframe_url = None
+
+                    business.category = search_for.split(' in ')[0].strip()
 
                     business_list.add_business(business)
                 except Exception as e:
