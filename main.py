@@ -15,6 +15,7 @@ class Business:
     name: str = None
     address: str = None
     category: str = None
+    kategori_id: str = None
     plus_code: str = None
     latitude: float = None
     longitude: float = None
@@ -121,12 +122,14 @@ def extract_latlng_from_plus_code(plus_code: str):
         code = plus_code.split(' ')[0].strip()
         # Jika code terlalu pendek (short code), tidak bisa didecode tanpa area
         decoded = olc.decode(olc.recoverNearest(code, -7.883063867394289, 112.53430108928096))
-        # decoded = olc.decode(code)
-        return decoded.latitudeCenter, decoded.longitudeCenter
+        # Convert to string and replace commas with periods before converting to float
+        lat = float(f"{decoded.latitudeCenter:.10f}".replace(',', '.'))
+        lng = float(f"{decoded.longitudeCenter:.10f}".replace(',', '.'))
+        return lat, lng
     except Exception as e:
         print(f"Decode error: {e}")
         return None, None
-
+    
 def format_operational_time(time_str: str) -> str:
     """Convert time format to 24-hour format with WIB"""
     try:
@@ -203,6 +206,27 @@ def get_desa_id(desa_name: str) -> str:
         "sumberbrantas": "3579022009"
     }
     return desa_mapping.get(desa_name.lower().strip(), None)
+
+
+def get_kategori_id(category_name: str) -> str:
+    """Maps category name to its ID (case-insensitive)"""
+    kategori_mapping = {
+        "pariwisata": "2",
+        "restoran": "3",
+        "warung": "3",
+        "rumah makan": "3",
+        "food & culinary": "3",
+        "fasilitas kesehatan": "4",
+        "faskes": "4",
+        "tempat ibadah": "5",
+        "dinas & badan opd": "6",
+        "spbu": "7", 
+        "pertanian": "8",
+        "perkebunan": "9",
+        "kebun": "9",
+        "tanah kosong": "11"
+    }
+    return kategori_mapping.get(category_name.lower().strip(), None)
 
 def main():
     # read search from arguments
@@ -342,8 +366,7 @@ def main():
                         business.name = ""
 
                     business.category = search_for.split(' in ')[0].strip()
-                    business.location = search_for.split(' in ')[-1].strip()
-                    # business.latitude, business.longitude = extract_coordinates_from_url(page.url)
+
                     try:
                         monday_row = page.locator('//tr[.//div[text()="Monday"]]')
                         if monday_row.count() > 0:
@@ -422,7 +445,17 @@ def main():
                         business.desa = None
                         business.desa_id = None
 
-                        
+                    category_match = re.search(r'^.*?(\w+)\s+kota\s+batu', search_for, re.IGNORECASE)
+                    if category_match:
+                        raw_category = category_match.group(1).lower().strip()
+                    else:
+                        raw_category = search_for.split(' in ')[0].strip().lower()
+                    
+                    business.category = raw_category
+
+
+                    business.kategori_id = get_kategori_id(raw_category)
+
                     business_list.add_business(business)
                 except Exception as e:
                     print(f'Error occurred: {e}', end='\r')
