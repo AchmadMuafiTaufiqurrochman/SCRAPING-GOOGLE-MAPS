@@ -13,22 +13,23 @@ import re
 class Business:
     """holds business data"""
     name: str = None
-    address: str = None
-    category: str = None
     kategori_id: str = None
-    plus_code: str = None
+    category: str = None
     latitude: float = None
     longitude: float = None
     iframe_url: str = None
+    plus_code: str = None
+    address: str = None
     jam_operasional: str = None
-    size_image: str = None
-    name_image: str = None
+    luas_wilayah: str = None
     built_year: int = None
     color: str = None
     kecamatan: str = None
     kecamatan_id: str = None
     desa: str = None
     desa_id: str = None
+    size_image: str = None
+    name_image: str = None
 
     
     def __hash__(self):
@@ -43,7 +44,11 @@ class Business:
         # Only include contact info fields if they're not empty
         
         return hash(tuple(hash_fields))
-
+    def assign_random_luas_wilayah(self):
+        """Assign a random value to luas_wilayah from predefined options"""
+        options = ["0,3 hektar", "0,5 hektar", "1 hektar", "1,5 hektar", "2 hektar"]
+        self.luas_wilayah = random.choice(options)
+        
 @dataclass
 class BusinessList:
     """holds list of Business objects,
@@ -228,6 +233,8 @@ def get_kategori_id(category_name: str) -> str:
     }
     return kategori_mapping.get(category_name.lower().strip(), None)
 
+
+    
 def main():
     # read search from arguments
     parser = argparse.ArgumentParser()
@@ -456,6 +463,9 @@ def main():
 
                     business.kategori_id = get_kategori_id(raw_category)
 
+                    business.assign_random_luas_wilayah()
+                    print(f"Business: {business.name}, Luas Wilayah: {business.luas_wilayah}")
+                    
                     business_list.add_business(business)
                 except Exception as e:
                     print(f'Error occurred: {e}', end='\r')
