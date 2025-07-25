@@ -13,23 +13,33 @@ import re
 class Business:
     """holds business data"""
     name: str = None
+    name_image: str = None
     kategori_id: str = None
-    category: str = None
     latitude: float = None
+    url_video: str = None
     longitude: float = None
+    facebook: str = "www.facebook.com"
+    instagram: str = "www.instagram.com"
+    twitter: str = "www.x.com"
+    youtube: str = "www.youtube.com"
     iframe_url: str = None
-    plus_code: str = None
     address: str = None
+    tahun_berdiri: int = None
     jam_operasional: str = None
     luas_wilayah: str = None
     built_year: int = None
     color: str = None
-    kecamatan: str = None
+    realisasi: int = 0
     kecamatan_id: str = None
-    desa: str = None
     desa_id: str = None
+    id_jenis: int = None
+    vr: int = 0
+    grafik: int = 0
+    kecamatan: str = None
+    desa: str = None
     size_image: str = None
-    name_image: str = None
+    plus_code: str = None
+    category: str = None
 
     
     def __hash__(self):
@@ -42,13 +52,17 @@ class Business:
         # We'll include name plus any non-empty contact info fields
         hash_fields = [self.name]
         # Only include contact info fields if they're not empty
-        
         return hash(tuple(hash_fields))
+    
     def assign_random_luas_wilayah(self):
         """Assign a random value to luas_wilayah from predefined options"""
         options = ["0,3 hektar", "0,5 hektar", "1 hektar", "1,5 hektar", "2 hektar"]
         self.luas_wilayah = random.choice(options)
-        
+
+    def assign_random_tahun_berdiri(self):
+        """Randomly select establishment year between 1998-2015"""
+        self.tahun_berdiri = random.randint(1998, 2015)
+
 @dataclass
 class BusinessList:
     """holds list of Business objects,
@@ -352,9 +366,9 @@ def main():
                         business.address = page.locator(address_xpath).all()[0].inner_text()
                     else:
                         business.address = ""
+                                            # Existing plus code button check
                     if page.locator(plus_code_button_xpath).count() > 0:
                         aria_label = page.locator(plus_code_button_xpath).first.get_attribute("aria-label")
-                        # Contoh isi aria_label: "Plus code: 4H43+43 Beji, Batu City, East Java"
                         if aria_label and "Plus code:" in aria_label:
                             plus_code_full = aria_label.replace("Plus code:", "").strip()
                             business.plus_code = plus_code_full.split(' ')[0]
@@ -365,6 +379,19 @@ def main():
                     else:
                         business.plus_code = ""
                         business.latitude, business.longitude = None, None
+
+                    # Improved address-based extraction
+                    if not business.plus_code and business.address:
+                        # Split address into parts and check first segment
+                        address_first_part = business.address.split(',')[0].strip()
+                        plus_code_match = re.search(
+                            r'^([A-Z0-9]{4}\+[A-Z0-9]{3,4})',  # Allows 3-4 chars after +
+                            address_first_part,
+                            re.IGNORECASE
+                        )
+                        if plus_code_match:
+                            business.plus_code = plus_code_match.group(1)
+                            business.latitude, business.longitude = extract_latlng_from_plus_code(business.plus_code)
 
                     if name_value := page.locator(name_attribute).inner_text():
                         business.name = name_value.strip()
@@ -464,9 +491,9 @@ def main():
                     business.kategori_id = get_kategori_id(raw_category)
 
                     business.assign_random_luas_wilayah()
-                    print(f"Business: {business.name}, Luas Wilayah: {business.luas_wilayah}")
-                    
+                    business.assign_random_tahun_berdiri()
                     business_list.add_business(business)
+                    print(f"Business: {business.name}, Telah disimpan", end='\r')
                 except Exception as e:
                     print(f'Error occurred: {e}', end='\r')
             
