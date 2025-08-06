@@ -352,7 +352,8 @@ def main():
                     address_xpath = '//button[@data-item-id="address"]//div[contains(@class, "fontBodyMedium")]'
                     plus_code_button_xpath = '//button[contains(@class, "CsEnBe") and @data-item-id="oloc"]'
                     share_selector = '//button[@aria-label="Share" and contains(@class, "g88MCb")]'
-                    embbed_map_button_selector = '//button[@aria-label="Embed a map"]'
+                    # Updated embed button selector based on new HTML structure
+                    embbed_map_button_selector = '//button[contains(@class, "zaxyGe") and @aria-label="Embed a map"]'
                     
                     business = Business()
                    
@@ -417,54 +418,119 @@ def main():
                     else:
                         business.name = ""
 
-                    # Add iframe URL extraction
+                    # Add iframe URL extraction - with improved selectors
                     try:
-                        # Click share button
-                        page.locator(share_selector).click()
-                        page.wait_for_timeout(3000)
+                        # Click share button with multiple possible selectors
+                        share_selectors = [
+                            '//button[@aria-label="Share" and contains(@class, "g88MCb")]',
+                            '//button[@aria-label="Share"]',
+                            '//button[contains(@class, "g88MCb")]',
+                            '//button[contains(@data-value, "Share")]'
+                        ]
                         
-                        # Click embed map button
-                        page.locator(embbed_map_button_selector).click()
-                        page.wait_for_timeout(3000)
+                        share_clicked = False
+                        for selector in share_selectors:
+                            try:
+                                if page.locator(selector).count() > 0:
+                                    page.locator(selector).first.click(timeout=5000)
+                                    share_clicked = True
+                                    break
+                            except:
+                                continue
                         
-                        # Set up clipboard monitoring before clicking copy button
+                        if not share_clicked:
+                            raise Exception("Could not find or click Share button")
+                            
+                        page.wait_for_timeout(2000)
+                        
+                        # Click embed map button with multiple possible selectors
+                        embed_selectors = [
+                            '//button[contains(@class, "zaxyGe") and @aria-label="Embed a map"]',
+                            '//button[@aria-label="Embed a map"]',
+                            '//button[contains(text(), "Embed a map")]',
+                            '//button[contains(@class, "waIsr") and @aria-label="Embed a map"]'
+                        ]
+                        
+                        embed_clicked = False
+                        for selector in embed_selectors:
+                            try:
+                                if page.locator(selector).count() > 0:
+                                    page.locator(selector).first.click(timeout=5000)
+                                    embed_clicked = True
+                                    break
+                            except:
+                                continue
+                        
+                        if not embed_clicked:
+                            raise Exception("Could not find or click Embed a map button")
+                            
+                        page.wait_for_timeout(2000)
+                        
+                        # Focus the page first to ensure clipboard access
+                        page.focus('body')
+                        page.wait_for_timeout(300)
+                        
                         # Clear clipboard first
-                        page.evaluate("() => navigator.clipboard.writeText('')")
-                        page.wait_for_timeout(500)
-                        
-                        # Click the Copy HTML button using the new selector
-                        copy_html_button = '//button[contains(@class, "VVjj3") and contains(@class, "PpaGLb")]'
-                        page.locator(copy_html_button).click()
-                        page.wait_for_timeout(1000)
-                        
-                        # Get clipboard content
-                        iframe_html = page.evaluate("() => navigator.clipboard.readText()")
-                        
-                        if iframe_html and isinstance(iframe_html, str) and iframe_html.strip():
-                            business.iframe_url = iframe_html.strip()
-                        else:
-                            business.iframe_url = None
-                        
-                        # Close dialog - try multiple methods
                         try:
-                            # Method 1: Try clicking close button if exists
-                            close_button = '//button[@aria-label="Close" or contains(@class, "VfPpkd-icon-LgbsSe")]'
-                            if page.locator(close_button).count() > 0:
-                                page.locator(close_button).first.click()
-                                page.wait_for_timeout(500)
-                            else:
-                                # Method 2: Press Escape key twice
-                                page.keyboard.press("Escape")
-                                page.wait_for_timeout(500)
-                                page.keyboard.press("Escape")
-                                page.wait_for_timeout(500)
+                            page.evaluate("() => navigator.clipboard.writeText('')")
+                            page.wait_for_timeout(300)
                         except:
-                            # Method 3: Fallback - click outside the dialog
-                            page.mouse.click(100, 100)
-                            page.wait_for_timeout(1000) 
+                            pass
+                        
+                        # Click the Copy HTML button with multiple possible selectors
+                        copy_selectors = [
+                            '//button[contains(@class, "VVjj3") and contains(@class, "PpaGLb")]',
+                            '//button[contains(text(), "Copy HTML")]',
+                            '//button[@aria-label="Copy HTML"]',
+                            '//button[contains(@class, "VVjj3")]',
+                            '//button[contains(@jslog, "50222")]'
+                        ]
+                        
+                        copy_clicked = False
+                        for selector in copy_selectors:
+                            try:
+                                if page.locator(selector).count() > 0:
+                                    page.locator(selector).first.click(timeout=5000)
+                                    copy_clicked = True
+                                    break
+                            except:
+                                continue
+                        
+                        if not copy_clicked:
+                            print("Warning: Could not find Copy HTML button, skipping iframe extraction")
+                            business.iframe_url = None
+                        else:
+                            page.wait_for_timeout(800)
+                            
+                            # Get clipboard content
+                            try:
+                                iframe_html = page.evaluate("() => navigator.clipboard.readText()")
+                                if iframe_html and isinstance(iframe_html, str) and iframe_html.strip():
+                                    business.iframe_url = iframe_html.strip()
+                                else:
+                                    business.iframe_url = None
+                            except:
+                                business.iframe_url = None
+                        
                     except Exception as e:
                         print(f"Error getting iframe URL: {e}")
                         business.iframe_url = None
+                    
+                    # AGGRESSIVE MODAL CLEANUP - Always execute
+                    finally:
+                        try:
+                            # Force close all modals with multiple escape presses
+                            for _ in range(5):
+                                page.keyboard.press("Escape")
+                                page.wait_for_timeout(200)
+                            
+                            # Click outside to ensure modal closes
+                            page.mouse.click(100, 100)
+                            page.wait_for_timeout(500)
+                            
+                        except Exception as cleanup_error:
+                            print(f"Modal cleanup error: {cleanup_error}")
+                            pass
 
                     business.category = search_for.split(' in ')[0].strip()
                     business.built_year = random.choice([2024, 2025, 2026])
