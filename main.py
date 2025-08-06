@@ -353,7 +353,6 @@ def main():
                     plus_code_button_xpath = '//button[contains(@class, "CsEnBe") and @data-item-id="oloc"]'
                     share_selector = '//button[@aria-label="Share" and contains(@class, "g88MCb")]'
                     embbed_map_button_selector = '//button[@aria-label="Embed a map"]'
-                    input_selector = 'input.yA7sBe'
                     
                     business = Business()
                    
@@ -420,25 +419,49 @@ def main():
 
                     # Add iframe URL extraction
                     try:
-                        # Use more specific selector for share button
-                       
+                        # Click share button
                         page.locator(share_selector).click()
-                        page.wait_for_timeout(3000)  # Increased timeout
+                        page.wait_for_timeout(3000)
                         
                         # Click embed map button
                         page.locator(embbed_map_button_selector).click()
                         page.wait_for_timeout(3000)
                         
-                        # Extract iframe URL from input field
-                        page.wait_for_selector(input_selector)
-                        iframe_html = page.locator(input_selector).input_value()
+                        # Set up clipboard monitoring before clicking copy button
+                        # Clear clipboard first
+                        page.evaluate("() => navigator.clipboard.writeText('')")
+                        page.wait_for_timeout(500)
                         
-                        # Parse src from iframe HTML
-                        business.iframe_url = iframe_html
+                        # Click the Copy HTML button using the new selector
+                        copy_html_button = '//button[contains(@class, "VVjj3") and contains(@class, "PpaGLb")]'
+                        page.locator(copy_html_button).click()
+                        page.wait_for_timeout(1000)
                         
-                        # Close dialog
-                        page.keyboard.press("Escape")
-                        page.wait_for_timeout(1000) 
+                        # Get clipboard content
+                        iframe_html = page.evaluate("() => navigator.clipboard.readText()")
+                        
+                        if iframe_html and isinstance(iframe_html, str) and iframe_html.strip():
+                            business.iframe_url = iframe_html.strip()
+                        else:
+                            business.iframe_url = None
+                        
+                        # Close dialog - try multiple methods
+                        try:
+                            # Method 1: Try clicking close button if exists
+                            close_button = '//button[@aria-label="Close" or contains(@class, "VfPpkd-icon-LgbsSe")]'
+                            if page.locator(close_button).count() > 0:
+                                page.locator(close_button).first.click()
+                                page.wait_for_timeout(500)
+                            else:
+                                # Method 2: Press Escape key twice
+                                page.keyboard.press("Escape")
+                                page.wait_for_timeout(500)
+                                page.keyboard.press("Escape")
+                                page.wait_for_timeout(500)
+                        except:
+                            # Method 3: Fallback - click outside the dialog
+                            page.mouse.click(100, 100)
+                            page.wait_for_timeout(1000) 
                     except Exception as e:
                         print(f"Error getting iframe URL: {e}")
                         business.iframe_url = None
